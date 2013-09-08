@@ -1,0 +1,12 @@
+windows:
+    modules:
+        - windows
+        - common
+mac:
+    modules:
+        - mac
+        - common
+linux:
+    modules:
+        - linux
+        - common
