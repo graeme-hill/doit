@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+require "trollop"
+require_relative "../lib/doit.rb"
+
+# configure command line arguments
+options = Trollop.options do
+  opt :clean, "Delete all build artifacts (next build will run from scratch)"
+  opt :verbose, "Include all commands being run in the output"
+end
+
+config = ARGV.shift
+
+if options.clean
+  DoIt.clean ".", options.verbose
+else
+  DoIt.build config, options.verbose
+end
