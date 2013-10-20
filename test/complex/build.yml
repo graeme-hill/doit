@@ -1,12 +1,18 @@
 windows:
+    type: exe
+    name: test.exe
     modules:
         - windows
         - common
 mac:
+    type: exe
+    name: test
     modules:
         - mac
         - common
 linux:
+    type: exe
+    name: test
     modules:
         - linux
         - common
