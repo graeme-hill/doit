@@ -12,17 +12,17 @@ module DoIt
   PUBLISH_DIR = "pub"
   LIB_DIR = "lib"
   INCLUDE_DIR = "include"
-  COMPILER = "clang++"
   BUILD_CONFIG_FILE = "build.yml"
-  SRC_EXTENSIONS = ["cpp", "c", "cc", "cxx"]
+  DEFAULT_SRC_EXTENSIONS = ["cpp", "c", "cc", "cxx"]
+  DEFAULT_COMPILER = "clang++"
   DEFAULT_OUTPUT_TYPE = "exe"
   DEFAULT_OUTPUT_NAME = "out"
 
   # contains info necessary to execute a build
   class BuildInfo
-    attr_reader :target, :dir, :modules, :type, :name, :extensions, :external_frameworks, :external_libs
+    attr_reader :target, :dir, :modules, :type, :name, :extensions, :external_frameworks, :external_libs, :lflags, :cflags, :compiler
 
-    def initialize(target, dir, modules, type, name, extensions, external_frameworks, external_libs)
+    def initialize(target, dir, modules, type, name, extensions, external_frameworks, external_libs, lflags, cflags, compiler)
       @target = target
       @dir = dir
       @modules = modules
@@ -31,6 +31,9 @@ module DoIt
       @extensions = extensions
       @external_frameworks = external_frameworks
       @external_libs = external_libs
+      @lflags = lflags
+      @cflags = cflags
+      @compiler = compiler
     end
 
     def self.load(path, config)
@@ -45,9 +48,13 @@ module DoIt
       modules = doc[config].has_key?("modules") ? doc[config]["modules"] : []
       type = doc[config].has_key?("type") ? doc[config]["type"] : DEFAULT_OUTPUT_TYPE
       name = doc[config].has_key?("name") ? doc[config]["name"] : DEFAULT_OUTPUT_NAME
+      extensions = doc[config].has_key?("extensions") ? doc[config]["extensions"] : DEFAULT_SRC_EXTENSIONS
       external_frameworks = doc[config].has_key?("external_frameworks") ? doc[config]["external_frameworks"] : []
       external_libs = doc[config].has_key?("external_libs") ? doc[config]["external_libs"] : []
-      BuildInfo.new config, ".", modules, type, name, SRC_EXTENSIONS, external_frameworks, external_libs
+      lflags = doc[config].has_key?("lflags") ? doc[config]["lflags"] : ""
+      cflags = doc[config].has_key?("cflags") ? doc[config]["cflags"] : ""
+      compiler = doc[config].has_key?("compiler") ? doc[config]["compiler"] : DEFAULT_COMPILER
+      BuildInfo.new config, ".", modules, type, name, extensions, external_frameworks, external_libs, lflags, cflags, compiler
     end
 
     def modules_source_files
@@ -120,8 +127,12 @@ module DoIt
   end
 
   def self.compile(compiler, source, dest, verbose, build_info)
+
+    # extra compiler flags
+    cflags = build_info.cflags.empty? ? "" : " #{build_info.cflags}"
+
     ensure_dir_exists(File.dirname(dest))
-    cmd = "#{compiler} -Wall -c #{source} -o #{dest} -I#{build_info.include_dir}"
+    cmd = "#{compiler} -Wall#{cflags} -c #{source} -o #{dest} -I#{build_info.include_dir}"
     if verbose
       puts cmd
     else
@@ -145,12 +156,19 @@ module DoIt
     # set load path for frameworks within a mac app bundle
     xlinker = build_info.type == "mac_app_bundle" ? " \\\n  -Xlinker -rpath -Xlinker \"@loader_path/../Frameworks\"" : ""
 
+    # extra linker flags
+    lflags = build_info.lflags.empty? ? "" : " \\\n  #{build_info.lflags}"
+
+    # list of obj files
+    obj_files = " \\\n  #{obj_files.join(" \\\n  ")}"
+
     # create the actual linker command and format it nicely so that it's readable in verbose mode
-    cmd = "#{linker} -o #{dest}#{xlinker} \\\n  #{obj_files.join(" \\\n  ")}"
+    cmd = "#{linker} -o #{dest}#{lflags}#{xlinker}"
     cmd += lib_dir_string
     cmd += framework_dir_string
     cmd += lib_string
     cmd += framework_string
+    cmd += obj_files
 
     if verbose
       puts cmd
@@ -241,15 +259,15 @@ module DoIt
   def self.build(config, verbose)
     build_info = BuildInfo.load BUILD_CONFIG_FILE, config
     manifest = SourceManifest.new(build_info)
-    deps = get_dependency_graph(COMPILER, manifest.files)
+    deps = get_dependency_graph(build_info.compiler, manifest.files)
     src_files = manifest.files.find_all { |f| f.is_stale? }
     obj_files = manifest.files.map { |f| f.obj_path }
     src_files.each do |f| 
-      compile(COMPILER, f.path, f.obj_path, verbose, build_info)
+      compile(build_info.compiler, f.path, f.obj_path, verbose, build_info)
     end
     libs = get_libs(build_info)
     pub_info = prepare_publish(build_info)
-    link(COMPILER, obj_files, libs, verbose, build_info, pub_info)
+    link(build_info.compiler, obj_files, libs, verbose, build_info, pub_info)
     publish(pub_info, build_info)
   end
 
