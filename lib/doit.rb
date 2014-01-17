@@ -6,13 +6,15 @@ require "yaml"
 
 module DoIt
 
-  # set some non-configurable directory names
+  # non-configurable directory/file names
   OBJ_DIR = "obj"
   SRC_DIR = "src"
   PUBLISH_DIR = "pub"
   LIB_DIR = "lib"
   INCLUDE_DIR = "include"
   BUILD_CONFIG_FILE = "build.yml"
+
+  # defaults for optional build settings
   DEFAULT_SRC_EXTENSIONS = ["cpp", "c", "cc", "cxx"]
   DEFAULT_COMPILER = "clang++"
   DEFAULT_OUTPUT_TYPE = "exe"
